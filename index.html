@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Permainan Sebutan Mandarin</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --danger: #f44336;
+            --accent: #FFD700;
+            --sky: #87CEEB;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Game Container */
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--sky);
+        }
+
+        /* Stats Header */
+        #stats {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 10;
+        }
+
+        /* Environment / City View */
+        #world {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87CEEB 60%, #55a630 60%);
+        }
+
+        .cloud {
+            position: absolute;
+            background: white;
+            width: 100px;
+            height: 40px;
+            border-radius: 20px;
+            opacity: 0.8;
+            animation: moveClouds 20s linear infinite;
+        }
+
+        @keyframes moveClouds {
+            from { left: -120px; }
+            to { left: 100%; }
+        }
+
+        /* Car & Obstacle */
+        #car {
+            position: absolute;
+            bottom: 15%;
+            left: 10%;
+            width: 80px;
+            height: 50px;
+            background: #e63946;
+            border-radius: 10px 20px 5px 5px;
+            transition: left 1s ease-in-out, transform 0.3s;
+            z-index: 5;
+        }
+
+        #car::before { /* Roof */
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 10px;
+            width: 40px;
+            height: 25px;
+            background: #e63946;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .wheel {
+            position: absolute;
+            bottom: -10px;
+            width: 20px;
+            height: 20px;
+            background: #333;
+            border-radius: 50%;
+        }
+
+        /* Obstacle (The Barrier) */
+        #obstacle {
+            position: absolute;
+            bottom: 15%;
+            left: 60%;
+            width: 20px;
+            height: 60px;
+            background: #8d99ae;
+            border: 4px solid #2b2d42;
+        }
+
+        /* UI Panel */
+        #ui-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            z-index: 20;
+        }
+
+        #chinese-text {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #333;
+            min-height: 1.6em;
+        }
+
+        /* Microphone Button */
+        #mic-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s, background 0.3s;
+            margin-bottom: 10px;
+        }
+
+        #mic-btn:active { transform: scale(0.9); }
+        #mic-btn.listening { background: var(--danger); animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+        }
+
+        #next-btn {
+            display: none;
+            margin-top: 10px;
+            padding: 12px 30px;
+            background: var(--accent);
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        #message {
+            margin-top: 10px;
+            font-weight: bold;
+            height: 1.2em;
+        }
+
+        /* Feedback Colors */
+        .correct { color: var(--primary); }
+        .wrong { color: var(--danger); }
+
+        /* Animation Classes */
+        .crash { transform: translateX(-20px) rotate(-5deg); }
+        .move-past { left: 110% !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="stats">
+        <span id="level-indicator">Tahap: 1 / 10</span>
+        <span id="score-display">Markah: 0</span>
+    </div>
+
+    <div id="world">
+        <div class="cloud" style="top: 10%; animation-delay: 0s;"></div>
+        <div class="cloud" style="top: 25%; animation-delay: 5s;"></div>
+        
+        <div id="car">
+            <div class="wheel" style="left: 5px;"></div>
+            <div class="wheel" style="right: 5px;"></div>
+        </div>
+
+        <div id="obstacle"></div>
+    </div>
+
+    <div id="ui-panel">
+        <div id="chinese-text">Memuatkan...</div>
+        <button id="mic-btn">🎤</button>
+        <div id="message">Tekan mikrofon & sebut ayat</div>
+        <button id="next-btn">Tahap Seterusnya ➡</button>
+    </div>
+</div>
+
+<script>
+    // 1. Data Ayat
+    const sentences = [
+        "大卫觉得这儿的菜很好吃。",
+        "这儿的环境很好。",
+        "服务员非常热情。",
+        "玛丽点了麻婆豆腐。",
+        "玛丽让服务员给他们一份菜单。",
+        "玛丽叫服务员。",
+        "请给我们菜单。",
+        "我要一碗米饭。",
+        "这家饭馆的菜又便宜又好吃。",
+        "我们想点两个菜和一瓶饮料。"
+    ];
+
+    let currentLevel = 0;
+    let score = 0;
+
+    // 2. Elemen DOM
+    const chineseTextDisp = document.getElementById('chinese-text');
+    const levelDisp = document.getElementById('level-indicator');
+    const scoreDisp = document.getElementById('score-display');
+    const micBtn = document.getElementById('mic-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const messageDisp = document.getElementById('message');
+    const car = document.getElementById('car');
+
+    // 3. Pengecaman Suara (Speech Recognition)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        alert("Pelayar ini tidak menyokong pengecaman suara. Sila gunakan Google Chrome.");
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN"; // Set to Chinese (Simplified)
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    // 4. Fungsi Utama
+    function initLevel() {
+        if (currentLevel >= sentences.length) {
+            chineseTextDisp.innerText = "Tahniah! Anda telah tamat!";
+            messageDisp.innerText = `Markah Akhir: ${score}`;
+            micBtn.style.display = 'none';
+            return;
+        }
+
+        chineseTextDisp.innerText = sentences[currentLevel];
+        levelDisp.innerText = `Tahap: ${currentLevel + 1} / ${sentences.length}`;
+        nextBtn.style.display = 'none';
+        messageDisp.innerText = "Tekan mikrofon & sebut ayat";
+        messageDisp.className = '';
+        
+        // Reset Car Position
+        car.style.left = "10%";
+        car.classList.remove('move-past', 'crash');
+    }
+
+    // Fungsi Kira Persamaan (Levenshtein Distance-ish)
+    function checkSimilarity(s1, s2) {
+        let matches = 0;
+        const target = s1.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+        const input = s2.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+        
+        for (let char of input) {
+            if (target.includes(char)) matches++;
+        }
+        return (matches / target.length) * 100;
+    }
+
+    // 5. Event Listeners
+    micBtn.addEventListener("click", async () => {
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            recognition.start();
+            micBtn.classList.add('listening');
+            messageDisp.innerText = "Mendengar...";
+        } catch (err) {
+            messageDisp.innerText = "Sila benarkan akses mikrofon untuk bermain.";
+        }
+    });
+
+    recognition.onresult = (event) => {
+        micBtn.classList.remove('listening');
+        const speechResult = event.results[0][0].transcript;
+        const targetText = sentences[currentLevel];
+        
+        const similarity = checkSimilarity(targetText, speechResult);
+        console.log("Input:", speechResult, "Sim:", similarity);
+
+        if (similarity >= 75) {
+            // Betul
+            score += 10;
+            scoreDisp.innerText = `Markah: ${score}`;
+            messageDisp.innerText = "Bagus! Sebutan betul!";
+            messageDisp.className = 'correct';
+            
+            // Animasi Kereta Lepas
+            car.classList.add('move-past');
+            nextBtn.style.display = 'inline-block';
+            
+            // Bunyi (Sintetik)
+            playTone(440, 0.2); // Success tone
+        } else {
+            // Salah
+            messageDisp.innerText = "Kurang tepat. Cuba lagi!";
+            messageDisp.className = 'wrong';
+            car.classList.add('crash');
+            setTimeout(() => car.classList.remove('crash'), 500);
+            playTone(150, 0.3); // Fail tone
+        }
+    };
+
+    recognition.onerror = (event) => {
+        micBtn.classList.remove('listening');
+        if (event.error === 'no-speech') {
+            messageDisp.innerText = "Tiada suara dikesan. Sila cuba lagi.";
+        } else {
+            console.error(event.error);
+        }
+    };
+
+    nextBtn.addEventListener("click", () => {
+        currentLevel++;
+        initLevel();
+    });
+
+    // 6. Audio Helper (Tanpa fail luar)
+    function playTone(freq, duration) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.frequency.value = freq;
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + duration);
+    }
+
+    // Mulakan Permainan
+    window.onload = initLevel;
+</script>
+
+</body>
+</html>
